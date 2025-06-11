@@ -1,4 +1,8 @@
+import pandas as pd, numpy as np
 import pulp as pl
+import itertools
+import pprint
+
 
 def run_case(params):
 # ----------------------------
@@ -66,28 +70,28 @@ base = {
     "P_exp"   : 10,       # JPY/kWh (feed-in tariff)
 }
 
-grid_prices = [5, 8, 9, 10, 25, 40]   # JPY/kWh
-for Cg in grid_prices:
-    res  = run_case(base | {"C_grid": Cg})
-    print(f"Cost of Grid={Cg} → PV={res['PV_kW']:.2f} kW, Bat={res['Bat_kWh']:.2f} kWh, Cost={res['Cost_JPY']:.0f}")
+# --- sweep lists
+pv_capex_list = [100_000, 120_000, 140_000]
+cf_list       = [0.10, 0.13, 0.16]
+fit_list      = [5, 10, 15]
+grid_price = 9   # JPY/kWh
 
-"""
-# ----------------------------
-# Results
-# ----------------------------
-print("--- Results ---")
-print("status:", pl.LpStatus[model.status])
+results = []
+for capex, cf, fit in itertools.product(pv_capex_list, cf_list, fit_list):
+    params = base | {
+        "C_PV_cap": capex,
+        "CF_PV": cf,
+        "P_exp": fit,
+        "C_grid": grid_price,
+    }
+    res = run_case(params)
+    results.append({
+        "CAPEX": capex,
+        "CF": cf,
+        "FIT": fit,
+        "PV_kW": res["PV_kW"],
+        "Grid_imp": res["Grid_imp"],
+        "Cost": res["Cost_JPY"],
+    })
 
-if model.status == 1:
-    print(f"PV capacity  [kW]  : {x_pv.value():8.3f}")
-    print(f"Battery cap. [kWh] : {x_bat.value():8.3f}")
-    print(f"Grid import [kWh]  : {E_imp.value():8.1f}")
-    print(f"Grid export [kWh] : {E_exp.value():8.1f}")
-    print(f"Total PV generation [kWh] : {E_pv.value():8.1f}")
-    print(f"Annual cost [JPY]  : {annual_cost.value():8.1f}")
-    print(f"Battery charge [kWh] : {E_bat_c.value():8.1f}")
-    print(f"Battery discharge[kWh]: {E_bat_d.value():8.1f}")
-
-else:
-    print("No optimal solution was found.") 
-"""
+pprint.pp(results)   # or convert to pandas for a nicer table
